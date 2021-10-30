@@ -198,9 +198,9 @@ public class BPlusTree {
     public Iterator<RecordId> scanAll() {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
-
-        // TODO(proj2): Return a BPlusTreeIterator.
-
+        if (root != null) {
+            return new BPlusTreeIterator(root.getLeftmostLeaf());
+        }
         return Collections.emptyIterator();
     }
 
@@ -232,8 +232,17 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): Return a BPlusTreeIterator.
-
+        if(root != null) {
+            LeafNode leafNode = root.get(key);
+            List<DataBox> keys = leafNode.getKeys();
+            int targetIndex = 0;
+            for(;targetIndex<keys.size();targetIndex++) {
+                if(key.compareTo(keys.get(targetIndex)) < 1) {
+                    break;
+                }
+            }
+            return new BPlusTreeIterator(leafNode, targetIndex - 1);
+        }
         return Collections.emptyIterator();
     }
 
@@ -421,18 +430,39 @@ public class BPlusTree {
     // Iterator ////////////////////////////////////////////////////////////////
     private class BPlusTreeIterator implements Iterator<RecordId> {
         // TODO(proj2): Add whatever fields and constructors you want here.
+        private LeafNode curNode;
+        private int index = -1;
+
+        public BPlusTreeIterator(LeafNode curNode) {
+            this.curNode = curNode;
+        }
+
+        public BPlusTreeIterator(LeafNode curNode, int index) {
+            this.curNode = curNode;
+            this.index = index;
+        }
 
         @Override
         public boolean hasNext() {
-            // TODO(proj2): implement
-
-            return false;
+            while (index + 1 >= curNode.getKeys().size()) { // curNode is empty or all tranversed
+                Optional<LeafNode> nextNode = curNode.getRightSibling();
+                if (nextNode.isPresent()) {
+                    curNode = nextNode.get();
+                    index = -1;
+                }
+                else {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
         public RecordId next() {
-            // TODO(proj2): implement
-
+            if (hasNext()) {
+                index++;
+                return curNode.getRids().get(index);
+            }
             throw new NoSuchElementException();
         }
     }
