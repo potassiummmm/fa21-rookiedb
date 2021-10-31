@@ -8,6 +8,7 @@ import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
+import jdk.nashorn.internal.runtime.Undefined;
 
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -193,8 +194,31 @@ class LeafNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
-        // TODO(proj2): implement
-
+        int d = metadata.getOrder();
+        int maxSize = (int)Math.ceil(2 * d * fillFactor);
+        Pair<DataBox, RecordId> curPair;
+        while (data.hasNext()) {
+            curPair = data.next();
+            keys.add(curPair.getFirst());
+            rids.add(curPair.getSecond());
+            if (keys.size() >= maxSize) {
+                break;
+            }
+        }
+        // Split
+        if (data.hasNext()) {
+            List<DataBox> newKeys = new ArrayList<>();
+            List<RecordId> newRids = new ArrayList<>();
+            curPair = data.next();
+            newKeys.add(curPair.getFirst());
+            newRids.add(curPair.getSecond());
+            LeafNode newNode = new LeafNode(metadata, bufferManager, newKeys, newRids, Optional.empty(), treeContext);
+            rightSibling = Optional.of(newNode.page.getPageNum());
+            sync();
+            newNode.sync();
+            return Optional.of(new Pair<>(newKeys.get(0), newNode.page.getPageNum()));
+        }
+        sync();
         return Optional.empty();
     }
 

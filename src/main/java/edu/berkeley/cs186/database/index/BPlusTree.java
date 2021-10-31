@@ -293,12 +293,21 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
-        // Note: You should NOT update the root variable directly.
-        // Use the provided updateRoot() helper method to change
-        // the tree's root if the old root splits.
-
-        return;
+        if (root != null && root.toSexp().equals("()")) { // Check whether the root is empty
+            Optional<Pair<DataBox, Long>> newChild = root.bulkLoad(data, fillFactor);
+            while (newChild.isPresent()) {
+                List<DataBox> newKeys = new ArrayList<>();
+                List<Long> newChildren = new ArrayList<>();
+                newKeys.add(newChild.get().getFirst());
+                newChildren.add(root.getPage().getPageNum());
+                newChildren.add(newChild.get().getSecond());
+                BPlusNode newRoot = new InnerNode(metadata, bufferManager, newKeys, newChildren, lockContext);
+                updateRoot(newRoot);
+                newChild = root.bulkLoad(data, fillFactor);
+            }
+        } else {
+            throw new BPlusTreeException("The tree is not empty at time of bulk loading!");
+        }
     }
 
     /**
@@ -444,7 +453,7 @@ public class BPlusTree {
 
         @Override
         public boolean hasNext() {
-            while (index + 1 >= curNode.getKeys().size()) { // curNode is empty or all tranversed
+            while (index + 1 >= curNode.getKeys().size()) { // curNode is empty or all traversed
                 Optional<LeafNode> nextNode = curNode.getRightSibling();
                 if (nextNode.isPresent()) {
                     curNode = nextNode.get();
