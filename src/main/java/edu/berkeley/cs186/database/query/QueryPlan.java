@@ -642,21 +642,35 @@ public class QueryPlan {
             Map<Set<String>, QueryOperator> pass1Map) {
         Map<Set<String>, QueryOperator> result = new HashMap<>();
         // TODO(proj3_part2): implement
-        // We provide a basic description of the logic you have to implement:
-        // For each set of tables in prevMap
-        //   For each join predicate listed in this.joinPredicates
-        //      Get the left side and the right side of the predicate (table name and column)
-        //
-        //      Case 1: The set contains left table but not right, use pass1Map
-        //              to fetch an operator to access the rightTable
-        //      Case 2: The set contains right table but not left, use pass1Map
-        //              to fetch an operator to access the leftTable.
-        //      Case 3: Otherwise, skip this join predicate and continue the loop.
-        //
-        //      Using the operator from Case 1 or 2, use minCostJoinType to
-        //      calculate the cheapest join with the new table (the one you
-        //      fetched an operator for from pass1Map) and the previously joined
-        //      tables. Then, update the result map if needed.
+        for (Set<String> tableSet : prevMap.keySet()) {
+            for (JoinPredicate joinPredicate : this.joinPredicates) {
+                Set<String> resultKey = new HashSet<>(tableSet);
+                String leftTable = joinPredicate.leftTable, rightTable = joinPredicate.rightTable;
+                QueryOperator newOp = null, resultOp;
+                if (tableSet.contains(leftTable) && !tableSet.contains(rightTable)) { // left but not right
+                    for (Set<String> set : pass1Map.keySet()) {
+                        if (set.contains(rightTable)) {
+                            newOp = pass1Map.get(set);
+                            break;
+                        }
+                    }
+                    resultKey.add(rightTable);
+                    resultOp = minCostJoinType(prevMap.get(tableSet), newOp, joinPredicate.leftColumn, joinPredicate.rightColumn);
+                    result.put(resultKey, resultOp);
+                }
+                else if (!tableSet.contains(leftTable) && tableSet.contains(rightTable)) { // right but not left
+                    for (Set<String> set : pass1Map.keySet()) {
+                        if (set.contains(leftTable)) {
+                            newOp = pass1Map.get(set);
+                            break;
+                        }
+                    }
+                    resultKey.add(leftTable);
+                    resultOp = minCostJoinType(newOp, prevMap.get(tableSet), joinPredicate.leftColumn, joinPredicate.rightColumn);
+                    result.put(resultKey, resultOp);
+                }
+            }
+        }
         return result;
     }
 
