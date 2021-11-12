@@ -575,8 +575,19 @@ public class QueryPlan {
      */
     public QueryOperator minCostSingleAccess(String table) {
         QueryOperator minOp = new SequentialScanOperator(this.transaction, table);
-
-        // TODO(proj3_part2): implement
+        int minIOCost = minOp.estimateIOCost(), minIndex = -1;
+        List<Integer> selectPredicatesIndices = getEligibleIndexColumns(table);
+        for (Integer index : selectPredicatesIndices) {
+            SelectPredicate p = this.selectPredicates.get(index);
+            QueryOperator indexScanOp = new IndexScanOperator(this.transaction, table, p.column, p.operator, p.value);
+            int curIOCost = indexScanOp.estimateIOCost();
+            if (curIOCost < minIOCost) {
+                minOp = indexScanOp;
+                minIOCost = curIOCost;
+                minIndex = index;
+            }
+        }
+        minOp = addEligibleSelections(minOp, minIndex);
         return minOp;
     }
 
