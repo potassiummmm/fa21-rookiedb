@@ -146,15 +146,6 @@ public class LockContext {
     }
 
     /**
-     * Helper method to recursively update numChildLocks
-     */
-    public void updateNumChildLocks(TransactionContext transaction) {
-        if (readonly) {
-            throw new UnsupportedOperationException();
-        }
-    }
-
-    /**
      * Promote `transaction`'s lock to `newLockType`. For promotion to SIX from
      * IS/IX, all S and IS locks on descendants must be simultaneously
      * released. The helper function sisDescendants may be helpful here.
@@ -187,17 +178,7 @@ public class LockContext {
         }
         if (newLockType == LockType.SIX) {
             List<ResourceName> resourceNames = sisDescendants(transaction);
-            for (ResourceName resourceName : resourceNames) {
-                LockContext parentContext = fromResourceName(lockman, resourceName).parent;
-                if (parentContext != null) {
-                    int num = parentContext.getNumChildren(transaction);
-                    parentContext.numChildLocks.put(transaction.getTransNum(), num - 1);
-                }
-            }
-            if (!resourceNames.isEmpty()) {
-                this.updateNumChildLocks(transaction);
-            }
-            resourceNames.add(name);
+            updateNumChildLocks(transaction, resourceNames);
             this.lockman.acquireAndRelease(transaction, name, newLockType, resourceNames);
         } else {
             this.lockman.promote(transaction, name, newLockType);
@@ -238,7 +219,6 @@ public class LockContext {
      * @throws UnsupportedOperationException if context is readonly
      */
     public void escalate(TransactionContext transaction) throws NoLockHeldException {
-        // TODO(proj4_part2): implement
         checkReadonly();
         if (lockman.getLockType(transaction, name) == LockType.NL) {
             throw new NoLockHeldException("The transaction has no lock at this level");
@@ -252,6 +232,14 @@ public class LockContext {
             targetLockType = LockType.S;
         }
         List<ResourceName> releasedNames = allDescendants(transaction);
+        updateNumChildLocks(transaction, releasedNames);
+        lockman.acquireAndRelease(transaction, name, targetLockType, releasedNames);
+    }
+
+    /**
+     * Helper method to update numChildLock
+     */
+    private void updateNumChildLocks(TransactionContext transaction, List<ResourceName> releasedNames) {
         for (ResourceName resourceName : releasedNames) {
             LockContext parentContext = fromResourceName(lockman, resourceName).parent;
             if (parentContext != null) {
@@ -260,7 +248,6 @@ public class LockContext {
             }
         }
         releasedNames.add(name);
-        lockman.acquireAndRelease(transaction, name, targetLockType, releasedNames);
     }
 
     /**
