@@ -44,7 +44,6 @@ public class LockUtil {
         LockType effectiveLockType = lockContext.getEffectiveLockType(transaction);
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
-        // TODO(proj4_part2): implement
         if (LockType.substitutable(effectiveLockType, requestType)) {
             return;
         }
@@ -86,7 +85,6 @@ public class LockUtil {
         }
     }
 
-    // TODO(proj4_part2) add any helper methods you want
     private static void ensureLocksOnAncestors(TransactionContext transaction, LockContext lockContext, LockType requestType) {
         LockContext curContext = lockContext;
         ArrayList<LockContext> lockContexts = new ArrayList<>();

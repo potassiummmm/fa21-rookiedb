@@ -930,8 +930,38 @@ public class Database implements AutoCloseable {
         @Override
         public void close() {
             try {
-                // TODO(proj4_part2)
-                return;
+                List<Lock> locks = lockManager.getLocks(this);
+                if (locks.isEmpty()) {
+                    return;
+                }
+                List<LockContext> contextList = new ArrayList<>();
+                LockContext rootContext = null;
+                for (Lock lock : locks) {
+                    LockContext curContext = LockContext.fromResourceName(lockManager, lock.name);
+                    contextList.add(curContext);
+                    if (curContext.parentContext() == null) {
+                        rootContext = curContext;
+                    }
+                }
+                if (rootContext == null) {
+                    return;
+                }
+                Queue<LockContext> contextQueue = new LinkedList<>();
+                Stack<LockContext> releasedStack = new Stack<>();
+                contextQueue.add(rootContext);
+                while (!contextQueue.isEmpty()) {
+                    LockContext curContext = contextQueue.poll();
+                    releasedStack.push(curContext);
+                    for (LockContext context : contextList) {
+                        if (context.parentContext() == curContext) {
+                            contextQueue.add(context);
+                        }
+                    }
+                    contextQueue.remove(curContext);
+                }
+                while (!releasedStack.empty()) {
+                    releasedStack.pop().release(this);
+                }
             } catch (Exception e) {
                 // There's a chance an error message from your release phase
                 // logic can get suppressed. This guarantees that the stack
