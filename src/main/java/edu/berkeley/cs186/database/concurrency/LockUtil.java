@@ -2,6 +2,9 @@ package edu.berkeley.cs186.database.concurrency;
 
 import edu.berkeley.cs186.database.TransactionContext;
 
+import java.util.ArrayList;
+import java.util.Collections;
+
 /**
  * LockUtil is a declarative layer which simplifies multigranularity lock
  * acquisition for the user (you, in the last task of Part 2). Generally
@@ -42,8 +45,76 @@ public class LockUtil {
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
         // TODO(proj4_part2): implement
-        return;
+        if (LockType.substitutable(effectiveLockType, requestType)) {
+            return;
+        }
+        if (requestType == LockType.S) {
+            ensureLocksOnAncestors(transaction, parentContext, LockType.S);
+            switch (explicitLockType) {
+                case IX:
+                    lockContext.promote(transaction, LockType.SIX);
+                    break;
+                case NL:
+                    lockContext.acquire(transaction, LockType.S);
+                    break;
+                case IS:
+                    lockContext.escalate(transaction);
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + explicitLockType);
+            }
+        }
+        else if (requestType == LockType.X) {
+            ensureLocksOnAncestors(transaction, parentContext, LockType.X);
+            switch (explicitLockType) {
+                case IX:
+                    lockContext.escalate(transaction);
+                    break;
+                case NL:
+                    lockContext.acquire(transaction, LockType.X);
+                    break;
+                case IS:
+                    lockContext.escalate(transaction);
+                    lockContext.promote(transaction, LockType.X);
+                    break;
+                case S:
+                    lockContext.promote(transaction, LockType.X);
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + explicitLockType);
+            }
+        }
     }
 
     // TODO(proj4_part2) add any helper methods you want
+    private static void ensureLocksOnAncestors(TransactionContext transaction, LockContext lockContext, LockType requestType) {
+        LockContext curContext = lockContext;
+        ArrayList<LockContext> lockContexts = new ArrayList<>();
+        while (curContext != null) {
+            lockContexts.add(curContext);
+            curContext = curContext.parent;
+        }
+        Collections.reverse(lockContexts);
+        for (LockContext context : lockContexts) {
+            if (requestType == LockType.S) {
+                if (context.getExplicitLockType(transaction) == LockType.NL) {
+                    context.acquire(transaction, LockType.IS);
+                }
+            }
+            else if (requestType == LockType.X) {
+                LockType explicitLockType = context.getExplicitLockType(transaction);
+                switch (explicitLockType) {
+                    case NL:
+                        context.acquire(transaction, LockType.IX);
+                        break;
+                    case S:
+                        context.promote(transaction, LockType.SIX);
+                        break;
+                    case IS:
+                        context.promote(transaction, LockType.IX);
+                        break;
+                }
+            }
+        }
+    }
 }
